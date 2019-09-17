@@ -271,6 +271,19 @@ void AretasSwarmBeeLE::setBRAR(boolean setting){
     }
 }
 
+void AretasSwarmBeeLE::setBlinkInterval(long blinkInterval){
+
+    sserial->begin(_targetBaudRate);
+    sserial->print(atCmdSbiv);
+    sserial->print(atCmdSpc);
+    sserial->print(blinkInterval);
+    sserial->print(atCmdTerminator);
+    delay(10);
+    if(_printResponses == true)
+        printResponse();
+
+}
+
 void AretasSwarmBeeLE::printSettings(){
 
     sserial->begin(_targetBaudRate);

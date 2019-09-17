@@ -35,6 +35,7 @@ class AretasSwarmBeeLE {
 
     void setERRN(boolean setting);
     void setBRAR(boolean setting);
+    void setBlinkInterval(long blinkInterval);
 
 	private:
 	byte getsTimeout(char *buf, uint16_t timeout, boolean filter = false);
