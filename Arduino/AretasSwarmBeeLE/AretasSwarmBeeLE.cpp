@@ -19,8 +19,17 @@ const char *atCmdSbiv = "SBIV"; //sets the broadcast interval value (blink rate)
 const char *atCmdGnid = "GNID"; //reads the configured node id
 const char *atCmdSset = "SSET"; //saves all settings including node id permanently to eeprom
 const char *atCmdRset = "RSET"; //restores all parameter settings from eeprom
-const char *atCmdGset = "GSET";
-const char *atCmdFnin = "FNIN";
+const char *atCmdGset = "GSET"; //get all settings
+const char *atCmdFnin = "FNIN"; //insert payload data
+const char *atCmdEmss = "EMSS"; //enables and disables mems sensor on the module
+const char *atCmdEbms = "EBMS"; //enables and disables broadcast of MEMS values (including temperature)
+const char *atCmdEidn = "EIDN"; //enables and disables node id broadcast notification
+const char *atCmdEdni = "EDNI"; //pending
+const char *atCmdSdmd = "SDMD"; //pending
+const char *atCmdSrob = "SROB"; //Selects Ranging Operation Blinks; sets which classes of devices the node will initiate a ranging operation with upon reception of a node blink ID packet.
+const char *atCmdGpio = "GPIO"; //GPIO configurations //GPIO 0 2 //GPIO 0 as wake - up with rising edge (internally in this case a pulldown is switched, i.e. open input is LOW).
+const char *atCmdIcfg = "ICFG"; //interrupt configuration  ICFG 0001 //only INT for GPIO 0 with rising edge**
+
 const char *atCmdSpc = " ";
 const char *atCmdTerminator = "\n";
 
@@ -32,7 +41,13 @@ AretasSwarmBeeLE::AretasSwarmBeeLE(SoftwareSerial *softSerialPort, HardwareSeria
 void AretasSwarmBeeLE::setPrintResponses(boolean printResponses){
     _printResponses = printResponses;
 }
-
+/**
+ * we need to call this begin function to setup baud rate negotiation and reset the module
+ * the reset is necessary in certain circumstances so we can be sure the baud rate is reset to default
+ * plus it's good to trigger the reset so we know the module is configured to defaults 
+ * and we've had a few issues with the modules not starting up cleanly as VCC comes up
+ * on low speed 8MHZ boards with SoftwareSerial, we need a kludge to get the module into a lower target baud rate
+ */
 boolean AretasSwarmBeeLE::begin(int resetPin, int aModePin, int targetBaudRate){
 
     _targetBaudRate = targetBaudRate;
@@ -68,7 +83,14 @@ boolean AretasSwarmBeeLE::begin(int resetPin, int aModePin, int targetBaudRate){
 
 }
 
-
+/**
+ * implementation of a multiple sensor data broadcast 
+ * we can serialize up to ~11 readings - the payload is ~60 bytes max and we need 5 bytes per sensor reading
+ * one byte for the type and 4 bytes for the serialized float
+ * @param *stypes the array of sensor types
+ * @param *values the array of float values
+ * @param NUM_SENSORS the size of the arrays
+ */
 
 void AretasSwarmBeeLE::printPacketMulti(byte *stypes, float *values, byte NUM_SENSORS){
 
@@ -162,7 +184,13 @@ void AretasSwarmBeeLE::printPacketMulti(byte *stypes, float *values, byte NUM_SE
         printResponse();
 
 }
-
+/**
+ * implementation of the Aretas printpacket command to send sensor data over the 
+ * SwarmBee module in a format compatible for middleware decoding
+ * 
+ * @param type the sensor type
+ * @param value the sensor reading
+ */
 void AretasSwarmBeeLE::printPacket(byte type, float value){
 
     sserial->begin(_targetBaudRate);
@@ -205,6 +233,9 @@ void AretasSwarmBeeLE::printPacket(byte type, float value){
         printResponse();
 }
 
+/**
+ * this gets us the NID for the module for provisioning purposes
+ */
 unsigned long AretasSwarmBeeLE::getUniqueId(){
     
     sserial->begin(_targetBaudRate);
@@ -225,7 +256,15 @@ unsigned long AretasSwarmBeeLE::getUniqueId(){
 
 }
 
-void AretasSwarmBeeLE::setERRN(boolean setting){
+/**
+ * Represents a type of boolean (0 or 1) type of command
+ * such as BRAR 0 (which enabled or disabled broadcast ranging results)
+ * we could print the decimal but I prefer being pedantic for clarity
+ *  and switching and printing a char
+ * @param setting the boolean 0 or 1 setting to enable / disable the setting
+ * @param cmd the command (such as BRAR)
+ */
+void AretasSwarmBeeLE::boolCmd(boolean setting, const char *cmd){
 
     sserial->begin(_targetBaudRate);
     char s;
@@ -238,7 +277,7 @@ void AretasSwarmBeeLE::setERRN(boolean setting){
             break;
     }
 
-    sserial->print(atCmdErrn);
+    sserial->print(cmd);
     sserial->print(atCmdSpc);
     sserial->print(s);
     sserial->print(atCmdTerminator);
@@ -246,31 +285,47 @@ void AretasSwarmBeeLE::setERRN(boolean setting){
     if(_printResponses){
         printResponse();
     }
+
+}
+
+void AretasSwarmBeeLE::setERRN(boolean setting){
+    boolCmd(setting, atCmdErrn);
 }
 
 void AretasSwarmBeeLE::setBRAR(boolean setting){
-
-    sserial->begin(_targetBaudRate);
-    char s;
-    switch(setting){
-        case false:
-            s = '0';
-            break;
-        case true:
-            s = '1';
-            break;
-    }
-
-    sserial->print(atCmdBrar);
-    sserial->print(atCmdSpc);
-    sserial->print(s);
-    sserial->print(atCmdTerminator);
-    delay(10);
-    if(_printResponses){
-        printResponse();
-    }
+    boolCmd(setting, atCmdBrar);
 }
 
+void AretasSwarmBeeLE::setEMSS(boolean setting){
+    boolCmd(setting, atCmdEmss);
+}
+void AretasSwarmBeeLE::setEBMS(boolean setting){
+    boolCmd(setting, atCmdEbms); 
+}
+
+void AretasSwarmBeeLE::setEIDN(boolean setting){
+    boolCmd(setting, atCmdEidn);
+}
+void AretasSwarmBeeLE::setEDNI(boolean setting){
+    boolCmd(setting, atCmdEdni);
+}
+void AretasSwarmBeeLE::setEDAN(boolean setting){
+    boolCmd(setting, atCmdEdan);
+}
+void AretasSwarmBeeLE::setEBID(boolean setting){
+    boolCmd(setting, atCmdEbid);
+}
+
+void AretasSwarmBeeLE::setSROB(int setting){}
+void AretasSwarmBeeLE::setICFG(int setting){}
+void AretasSwarmBeeLE::setGPIO(int gpio, int setting){}
+
+/**
+ * an accessible function for setting the blink rate 
+ * @param blinkInterval the blink interval in milliseconds
+ * standard range is 0 - 65000 however for practical purposes
+ * 100-200ms are the general minimums we've tested
+ */
 void AretasSwarmBeeLE::setBlinkInterval(long blinkInterval){
 
     sserial->begin(_targetBaudRate);
@@ -284,6 +339,9 @@ void AretasSwarmBeeLE::setBlinkInterval(long blinkInterval){
 
 }
 
+/**
+ * print the settings stored in the module to the hardware serial hardSerialPort
+ */
 void AretasSwarmBeeLE::printSettings(){
 
     sserial->begin(_targetBaudRate);
@@ -295,6 +353,9 @@ void AretasSwarmBeeLE::printSettings(){
     
 }
 
+/**
+ * reset the module settings to the default
+ */
 void AretasSwarmBeeLE::resetSettings(){
 
     sserial->begin(_targetBaudRate);
@@ -307,6 +368,9 @@ void AretasSwarmBeeLE::resetSettings(){
 
 }
 
+/** 
+ * save any runtime config changes to permanent memory
+ */
 void AretasSwarmBeeLE::saveSettings(){
 
     sserial->begin(_targetBaudRate);
@@ -318,6 +382,10 @@ void AretasSwarmBeeLE::saveSettings(){
     }
 }
 
+/**
+ * utility function for printing the module response 
+ * (note that we don't parse cmnd responses right now)
+ */
 void AretasSwarmBeeLE::printResponse(unsigned long timeout = 2000){
 
     sserial->listen();

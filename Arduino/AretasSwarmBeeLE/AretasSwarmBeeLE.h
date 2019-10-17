@@ -35,7 +35,18 @@ class AretasSwarmBeeLE {
 
     void setERRN(boolean setting);
     void setBRAR(boolean setting);
+    void setEMSS(boolean setting);
+    void setEBMS(boolean setting);
+    void setEIDN(boolean setting);
+    void setEDNI(boolean setting);
+    void setEDAN(boolean setting);
+    void setEBID(boolean setting);
+    void setSROB(int setting);
+    void setICFG(int setting);
+    void setGPIO(int gpio, int setting);
+
     void setBlinkInterval(long blinkInterval);
+    void boolCmd(boolean setting, const char *cmd);
 
 	private:
 	byte getsTimeout(char *buf, uint16_t timeout, boolean filter = false);
