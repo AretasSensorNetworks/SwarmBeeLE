@@ -4,31 +4,39 @@
 #include <avr/pgmspace.h>
 #include <SoftwareSerial.h>
 
-#define BUF_LENGTH 30 //may need to increase for this application
+#define BUF_LENGTH 30 // may need to increase for this application
 
 #define SBEE_DEBUG1 1
 //#define SBEE_DEBUG2 2
 
-const char *atCmdSuas = "SUAS"; //get low serial number
-const char *atCmdBrar = "BRAR"; //set broadcast ranging result op
-const char *atCmdErrn = "ERRN"; //set enable ranging result notifications
-const char *atCmdEdan = "EDAN"; //enables disables data notifications
-const char *atCmdSdat = "FNIN"; //fill data into node id notification packets 
-const char *atCmdEbid = "EBID"; //enable broadcast id of node id blink packets
-const char *atCmdSbiv = "SBIV"; //sets the broadcast interval value (blink rate)
-const char *atCmdGnid = "GNID"; //reads the configured node id
-const char *atCmdSset = "SSET"; //saves all settings including node id permanently to eeprom
-const char *atCmdRset = "RSET"; //restores all parameter settings from eeprom
-const char *atCmdGset = "GSET"; //get all settings
-const char *atCmdFnin = "FNIN"; //insert payload data
-const char *atCmdEmss = "EMSS"; //enables and disables mems sensor on the module
-const char *atCmdEbms = "EBMS"; //enables and disables broadcast of MEMS values (including temperature)
-const char *atCmdEidn = "EIDN"; //enables and disables node id broadcast notification
-const char *atCmdEdni = "EDNI"; //pending
-const char *atCmdSdmd = "SDMD"; //pending
-const char *atCmdSrob = "SROB"; //Selects Ranging Operation Blinks; sets which classes of devices the node will initiate a ranging operation with upon reception of a node blink ID packet.
-const char *atCmdGpio = "GPIO"; //GPIO configurations //GPIO 0 2 //GPIO 0 as wake - up with rising edge (internally in this case a pulldown is switched, i.e. open input is LOW).
-const char *atCmdIcfg = "ICFG"; //interrupt configuration  ICFG 0001 //only INT for GPIO 0 with rising edge**
+#define RESET_LOW_DELAY 2000
+#define RESET_HIGH_DELAY 1000
+#define BAUD_RATE_NEGOTIATION_DELAY 10
+#define BAUD_RATE_SWITCH_DELAY 100
+#define COMMAND_RESPONSE_DELAY 10
+#define SETTINGS_PERSIST_DELAY 30
+#define PRINT_RESPONSE_TIMEOUT 2000
+
+const char *atCmdSuas = "SUAS"; // get low serial number
+const char *atCmdBrar = "BRAR"; // set broadcast ranging result op
+const char *atCmdErrn = "ERRN"; // set enable ranging result notifications
+const char *atCmdEdan = "EDAN"; // enables disables data notifications
+const char *atCmdSdat = "FNIN"; // fill data into node id notification packets 
+const char *atCmdEbid = "EBID"; // enable broadcast id of node id blink packets
+const char *atCmdSbiv = "SBIV"; // sets the broadcast interval value (blink rate)
+const char *atCmdGnid = "GNID"; // reads the configured node id
+const char *atCmdSset = "SSET"; // saves all settings including node id permanently to eeprom
+const char *atCmdRset = "RSET"; // restores all parameter settings from eeprom
+const char *atCmdGset = "GSET"; // get all settings
+const char *atCmdFnin = "FNIN"; // insert payload data
+const char *atCmdEmss = "EMSS"; // enables and disables mems sensor on the module
+const char *atCmdEbms = "EBMS"; // enables and disables broadcast of MEMS values (including temperature)
+const char *atCmdEidn = "EIDN"; // enables and disables node id broadcast notification
+const char *atCmdEdni = "EDNI"; // pending
+const char *atCmdSdmd = "SDMD"; // pending
+const char *atCmdSrob = "SROB"; // Selects Ranging Operation Blinks; sets which classes of devices the node will initiate a ranging operation with upon reception of a node blink ID packet.
+const char *atCmdGpio = "GPIO"; // GPIO configurations //GPIO 0 2 //GPIO 0 as wake - up with rising edge (internally in this case a pulldown is switched, i.e. open input is LOW).
+const char *atCmdIcfg = "ICFG"; // interrupt configuration  ICFG 0001 //only INT for GPIO 0 with rising edge**
 
 const char *atCmdSpc = " ";
 const char *atCmdTerminator = "\n";
@@ -52,31 +60,31 @@ boolean AretasSwarmBeeLE::begin(int resetPin, int aModePin, int targetBaudRate){
 
     _targetBaudRate = targetBaudRate;
     
-    //reset the module
-    //we have to reset the module otherwise we can't seem to write to it 
-    //noticed this behaviour on other tests on FTDI and other serial (so it's not just our board)
+    // reset the module
+    // we have to reset the module otherwise we can't seem to write to it 
+    // noticed this behaviour on other tests on FTDI and other serial (so it's not just our board)
     pinMode(resetPin, OUTPUT);
     digitalWrite(resetPin, LOW);
-    delay(2000);
+    delay(RESET_LOW_DELAY);
     digitalWrite(resetPin, HIGH);
-    delay(1000);
+    delay(RESET_HIGH_DELAY);
 
-    //negotiate a lower baud rate 
-    //we cannot handle 115200 and that's the stock baud rate of the module therefore we need to 
-    //try and negotiate a baud rate we can handle
-    //don't mess with this code, every time I change even the smallest thing, it quits working
-    //it's absolutely crucial to negotiate the new baudrate as the first thing the module does when it boots up
-    //and the atmega is starting up - softwareserial @ 8MHZ , 115200 is totally impractical, 
-    //so it's a small miracle that this works on our 8MHZ boards
+    // negotiate a lower baud rate 
+    // we cannot handle 115200 and that's the stock baud rate of the module therefore we need to 
+    // try and negotiate a baud rate we can handle
+    // don't mess with this code, every time I change even the smallest thing, it quits working
+    // it's absolutely crucial to negotiate the new baudrate as the first thing the module does when it boots up
+    // and the atmega is starting up - softwareserial @ 8MHZ , 115200 is totally impractical, 
+    // so it's a small miracle that this works on our 8MHZ boards
     sserial->begin(115200);
-    delay(10);
+    delay(BAUD_RATE_NEGOTIATION_DELAY);
     sserial->print(atCmdSuas);
     sserial->print(atCmdSpc);
     sserial->print(targetBaudRate);
     sserial->print(atCmdTerminator);
     sserial->end();
     sserial->begin(targetBaudRate);
-    delay(100);
+    delay(BAUD_RATE_SWITCH_DELAY);
 
     if(_printResponses == true)
         printResponse();
@@ -96,14 +104,14 @@ void AretasSwarmBeeLE::printPacketMulti(byte *stypes, float *values, byte NUM_SE
 
     sserial->begin(_targetBaudRate);
 
-    char packet[3] = {0,0,0}; //placeholder for ascii byte packet
+    char packet[3] = {0,0,0}; // placeholder for ascii byte packet
 
     union {
         float fval;
         byte bval[4];
     } floatToBytes;
 
-    //print the FNIN command
+    // print the FNIN command
     sserial->print(atCmdFnin);
     sserial->print(atCmdSpc);
 
@@ -124,8 +132,8 @@ void AretasSwarmBeeLE::printPacketMulti(byte *stypes, float *values, byte NUM_SE
 
     #endif
     
-    //print a two byte packet length
-    //each packet is one byte for type and 4 bytes for the serialized float32 
+    // print a two byte packet length
+    // each packet is one byte for type and 4 bytes for the serialized float32 
     byte packet_length = 0;
     packet_length = NUM_SENSORS * 5;
 
@@ -157,7 +165,7 @@ void AretasSwarmBeeLE::printPacketMulti(byte *stypes, float *values, byte NUM_SE
         Serial.print(packet);
         #endif
 
-        //print the float
+        // print the float
         floatToBytes.fval = values[z];
 
         int j = 0;
@@ -179,7 +187,7 @@ void AretasSwarmBeeLE::printPacketMulti(byte *stypes, float *values, byte NUM_SE
     Serial.print(atCmdTerminator);
     #endif
 
-    delay(10);
+    delay(COMMAND_RESPONSE_DELAY);
     if(_printResponses == true)
         printResponse();
 
@@ -194,20 +202,20 @@ void AretasSwarmBeeLE::printPacketMulti(byte *stypes, float *values, byte NUM_SE
 void AretasSwarmBeeLE::printPacket(byte type, float value){
 
     sserial->begin(_targetBaudRate);
-    //FNIN command looks like: FNIN 0f f800008042f600009841b50000eb43
-    //above example has 3 sensor readings
+    // FNIN command looks like: FNIN 0f f800008042f600009841b50000eb43
+    // above example has 3 sensor readings
 
-    char packet[2]; //placeholder for ascii byte packet
+    char packet[2]; // placeholder for ascii byte packet
 
     union {
         float fval;
         byte bval[4];
     } floatAsBytes;
 
-    //print the FNIN command
+    // print the FNIN command
     sserial->print(atCmdFnin);
     
-    //print a two byte packet length 
+    // print a two byte packet length 
     byte packet_length = 5;
 
     sprintf(packet, "%02X", packet_length);
@@ -218,7 +226,7 @@ void AretasSwarmBeeLE::printPacket(byte type, float value){
     sprintf(packet, "%02X", type);
     sserial->print(packet);
 
-    //print the float
+    // print the float
     floatAsBytes.fval = value;
 
     int i = 0;
@@ -228,7 +236,7 @@ void AretasSwarmBeeLE::printPacket(byte type, float value){
     }
 
     sserial->print(atCmdTerminator);
-    delay(10);
+    delay(COMMAND_RESPONSE_DELAY);
     if(_printResponses == true)
         printResponse();
 }
@@ -241,18 +249,18 @@ unsigned long AretasSwarmBeeLE::getUniqueId(){
     sserial->begin(_targetBaudRate);
     char buf[BUF_LENGTH];
 
-	sserial->print(atCmdGnid);
+    sserial->print(atCmdGnid);
     sserial->print(atCmdTerminator);
 
-	unsigned long ul = 0;
+    unsigned long ul = 0;
 
-    //filter out the '=' response
+    // filter out the '=' response
     byte len = getsTimeout(buf, 1000, true);
     if(len > 0){
         ul = strtoul(buf, NULL, 16);
     }
 
-	return ul;
+    return ul;
 
 }
 
@@ -281,7 +289,7 @@ void AretasSwarmBeeLE::boolCmd(boolean setting, const char *cmd){
     sserial->print(atCmdSpc);
     sserial->print(s);
     sserial->print(atCmdTerminator);
-    delay(10);
+    delay(COMMAND_RESPONSE_DELAY);
     if(_printResponses){
         printResponse();
     }
@@ -333,7 +341,7 @@ void AretasSwarmBeeLE::setBlinkInterval(long blinkInterval){
     sserial->print(atCmdSpc);
     sserial->print(blinkInterval);
     sserial->print(atCmdTerminator);
-    delay(10);
+    delay(COMMAND_RESPONSE_DELAY);
     if(_printResponses == true)
         printResponse();
 
@@ -347,7 +355,7 @@ void AretasSwarmBeeLE::printSettings(){
     sserial->begin(_targetBaudRate);
     sserial->print(atCmdGset);
     sserial->print(atCmdTerminator);
-    delay(10);
+    delay(COMMAND_RESPONSE_DELAY);
     if(_printResponses == true)
         printResponse();
     
@@ -361,8 +369,8 @@ void AretasSwarmBeeLE::resetSettings(){
     sserial->begin(_targetBaudRate);
     sserial->print(atCmdRset);
     sserial->print(atCmdTerminator);
-    //arbitrary delay to wait for the settings to persist
-    delay(30);
+    // arbitrary delay to wait for the settings to persist
+    delay(SETTINGS_PERSIST_DELAY);
     if(_printResponses == true)
         printResponse();
 
@@ -376,57 +384,72 @@ void AretasSwarmBeeLE::saveSettings(){
     sserial->begin(_targetBaudRate);
     sserial->print(atCmdSset);
     sserial->print(atCmdTerminator);
-    delay(10);
+    delay(COMMAND_RESPONSE_DELAY);
     if(_printResponses){
         printResponse();
     }
 }
 
 /**
- * utility function for printing the module response 
- * (note that we don't parse cmnd responses right now)
+ * Utility function for printing the module response.
+ * Reads characters from the software serial buffer and prints them to the hardware serial port.
+ * The function runs until no more characters are available or a specified timeout occurs.
+ * Note: This function does not parse command responses.
+ * 
+ * @param timeout The maximum amount of time (in milliseconds) to wait for characters to be read. Default is PRINT_RESPONSE_TIMEOUT.
  */
-void AretasSwarmBeeLE::printResponse(unsigned long timeout = 2000){
+void AretasSwarmBeeLE::printResponse(unsigned long timeout = PRINT_RESPONSE_TIMEOUT){
 
-    sserial->listen();
+    sserial->listen(); // Ensure the software serial is the active serial port
 
-    unsigned long start = millis();
+    unsigned long start = millis(); // Record the start time
     while(sserial->available() > 0){
-        hwserial->print((char)sserial->read());
+        // Continue reading while characters are available in the buffer
+        hwserial->print((char)sserial->read()); // Read a character from the software serial and print it to the hardware serial
         if((millis() - start) > timeout){
+            // Break the loop if the timeout has been exceeded
             break;
         }
     }
 
 }
 
+
+/**
+ * Reads characters from the software serial buffer into the provided buffer until either a timeout occurs or the buffer is full.
+ * Optionally filters out a specific character.
+ * 
+ * @param buf A pointer to the buffer where the read characters will be stored.
+ * @param timeout The maximum amount of time (in milliseconds) to wait for characters to be read.
+ * @param filter If true, a specific character ('=') will be filtered out from the read characters.
+ * 
+ * @return The number of characters read into the buffer, including the null terminator if characters were read, or 0 if no characters were read.
+ */
 byte AretasSwarmBeeLE::getsTimeout(char *buf, uint16_t timeout, boolean filter = false) {
     
-    byte count = 0;
-    long timeIsOut = 0;
-    byte c;
-    *buf = 0;
-    timeIsOut = millis() + timeout;
+    byte count = 0;                 // Counter for the number of characters read
+    long timeIsOut = 0;             // Variable to track the timeout
+    byte c;                         // Variable to store each character read from the serial buffer
+    *buf = 0;                       // Initialize the buffer to be an empty string
+    timeIsOut = millis() + timeout; // Calculate the time when the timeout will occur
 
-    sserial->listen();
+    sserial->listen();              // Ensure the software serial is the active serial port
     
     while (timeIsOut > millis() && count < (BUF_LENGTH - 1)) {
-        
+        // Continue reading until timeout occurs or buffer is nearly full
         if (sserial->available() > 0) {
             count++;
             c = sserial->read();
-            if(filter == true)
-                if(c == '=') continue;
-            *buf++ = c;
-            timeIsOut = millis() + timeout;
+            if(filter == true && c == '=') continue; // Skip the character if filtering and character is '='
+            *buf++ = c;             // Store the character in the buffer
+            timeIsOut = millis() + timeout; // Reset the timeout after each successful read
         }
     }
     
     if (count != 0) {
-        *buf = 0;
+        *buf = 0;                   // Null-terminate the buffer if characters were read
         count++;
     }
     
-    return count;
+    return count;                   // Return the number of characters read (including null terminator if added)
 }
-
